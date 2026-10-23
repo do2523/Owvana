@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const groupSchema = new mongoose.Schema({
+
     name: {
         type: String,
         required: true
@@ -15,6 +16,7 @@ const groupSchema = new mongoose.Schema({
         type: Date,
         default: Date.now
     }
+    
 });
 
 module.exports = mongoose.model("Group", groupSchema);
