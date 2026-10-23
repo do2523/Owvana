@@ -19,6 +19,8 @@ const expenseSplitSchema = new mongoose.Schema({
         required: true
     }
 
+}, {
+    collection: "expense_splits"
 });
 
 module.exports = mongoose.model("ExpenseSplit", expenseSplitSchema);
