@@ -52,6 +52,12 @@ async function testRelationships() {
         });
         console.log(expense);
 
+        const populatedExpense = await Expense.findById(expense._id)
+            .populate("group_id")
+            .populate("category_id")
+            .populate("paid_by");
+        console.log(populatedExpense);
+
         const expenseSplit = await ExpenseSplit.create({
             expense_id: expense._id,
             participant_id: participant._id,
