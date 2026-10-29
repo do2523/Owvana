@@ -1,12 +1,16 @@
 const mongoose = require("mongoose");
+
+// Stores expenses created within a group
 const expenseSchema = new mongoose.Schema({
 
+    // References the group where the expense belongs
     group_id: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Group",
         required: true
     },
 
+    // References the category assigned to the expense
     category_id: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Category"
@@ -17,6 +21,7 @@ const expenseSchema = new mongoose.Schema({
         required: true
     },
 
+    // References the participant who paid for the expense
     paid_by: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Participant",
@@ -40,4 +45,5 @@ const expenseSchema = new mongoose.Schema({
 
 });
 
+// Export Expense model
 module.exports = mongoose.model("Expense", expenseSchema);

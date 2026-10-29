@@ -1,4 +1,6 @@
 const mongoose = require("mongoose");
+
+// Stores registered user account information
 const userSchema = new mongoose.Schema({
 
     name: {
@@ -12,6 +14,7 @@ const userSchema = new mongoose.Schema({
         unique: true
     },
 
+    // Indicates whether the user's email has been verified
     email_verified: {
         type: Boolean,
         default: false
@@ -30,6 +33,7 @@ const userSchema = new mongoose.Schema({
         type: Date
     },
 
+    // Token and expiration for password reset functionality
     reset_token_hash: {
         type: String
     },
@@ -45,4 +49,5 @@ const userSchema = new mongoose.Schema({
     
 });
 
+// Export User model for use by the API
 module.exports = mongoose.model("User", userSchema);

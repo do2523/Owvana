@@ -1,4 +1,6 @@
 const mongoose = require("mongoose");
+
+// Stores expense groups created by registered users
 const groupSchema = new mongoose.Schema({
 
     name: {
@@ -6,6 +8,7 @@ const groupSchema = new mongoose.Schema({
         required: true
     },
 
+    // Reference to the user who owns the group
     owner_id: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
@@ -19,4 +22,5 @@ const groupSchema = new mongoose.Schema({
     
 });
 
+// Export Gorup model
 module.exports = mongoose.model("Group", groupSchema);
