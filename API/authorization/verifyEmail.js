@@ -1,6 +1,6 @@
 import express from 'express';
 import crypto from 'crypto';
-import User from '../../database/models/User.js'
+import User from '../../backend/database/models/User.js'
 
 const router = express.Router();
 
