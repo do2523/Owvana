@@ -4,7 +4,7 @@ const router = express.Router();
 
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const User = require("../../database/models/User");
+const User = require("../../backend/database/models/User.js");
 
 //create login endpoint
 router.post("/login", async (req, res) => {
