@@ -1,6 +1,3 @@
-const express = require("express");
-const router = express.Router();
-
 const crypto = require("node:crypto");
 const User = require("../../backend/database/models/User");
 
@@ -41,7 +38,7 @@ function verifyPassword(password, storedHash) {
 }
 
 // Create login endpoint
-router.post("/login", async (req, res) => {
+async function login(req, res) {
     try {
         // Retrieve email and password from request body
         const { email, password } = req.body || {};
@@ -99,7 +96,6 @@ router.post("/login", async (req, res) => {
             error: "Internal server error"
         });
     }
-});
+}
 
-// Export router
-module.exports = router;
+module.exports = { login };
