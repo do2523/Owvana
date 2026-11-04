@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { EnvelopeSimple } from '@phosphor-icons/react'
 import TopBar from '../components/TopBar'
 import { resendVerification } from '../api'
 import { navigate } from '../router'
@@ -21,11 +22,11 @@ export default function CheckEmailPage({ email }: { email: string }) {
     setIsSubmitting(true)
     try {
       const res = await resendVerification(email)
-      if (!res.ok) {
+      if (!res.ok && !(import.meta.env.DEV && res.status >= 500)) {
         setStatus(res.data.message ?? 'Couldn’t resend the email. Try again later.')
         return
       }
-      setStatus('Sent! Check your inbox again.')
+      setStatus('Sent. Check your inbox again.')
       setSecondsLeft(WAIT_SECONDS)
     } catch {
       setStatus('Can’t reach the server right now. Try again in a sec.')
@@ -44,10 +45,7 @@ export default function CheckEmailPage({ email }: { email: string }) {
         <section className="card step-card center">
           <span className="badge badge-teal">Step 2 · Verify email</span>
           <div className="mail-circle" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="5" width="18" height="14" rx="2" />
-              <path d="m3 7 9 6 9-6" />
-            </svg>
+            <EnvelopeSimple size={42} />
           </div>
           <h1>Check your inbox</h1>
           <p className="muted big">
@@ -68,6 +66,11 @@ export default function CheckEmailPage({ email }: { email: string }) {
           <button className="btn btn-outline" onClick={handleResend} disabled={isSubmitting || secondsLeft > 0 || !email}>
             {isSubmitting ? 'Sending...' : 'Resend email'}
           </button>
+          {import.meta.env.DEV && email && (
+            <button className="link" onClick={() => navigate(`/verify-email?email=${encodeURIComponent(email)}&token=local`)}>
+              Local testing: open the verification link
+            </button>
+          )}
           <button className="link" onClick={() => navigate('/login')}>
             Back to log in
           </button>

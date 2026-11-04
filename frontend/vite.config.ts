@@ -18,7 +18,7 @@ export default defineConfig({
       '/verifyEmail': backend,
       '/resetPassword': backend,
       '/resendVerification': backend,
-      '/setNewPassword': backend,
+      '/forgotPassword': backend,
     },
   },
 })

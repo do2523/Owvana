@@ -3,9 +3,15 @@
 type ApiResult<T> = { ok: boolean; status: number; data: T & { message?: string } }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<ApiResult<T>> {
+  // send the login token along if we have one
+  const token = getToken()
   const response = await fetch(path, {
     ...options,
-    headers: { 'Content-Type': 'application/json', ...options.headers },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options.headers,
+    },
   })
 
   let data = {} as T & { message?: string; error?: string }
@@ -52,17 +58,18 @@ export function verifyEmail(token: string) {
   return request<{ verified?: boolean }>(`/verifyEmail?${params}`)
 }
 
+// these two match forgotPassword and resetPassword in API/authorization/passwordController.js
 export function sendResetLink(email: string) {
-  return post('/resetPassword', { email })
+  return post('/forgotPassword', { email })
 }
 
-// TODO: not on the API list yet, waiting on the API team for the real paths
+// TODO: not on the API list yet, waiting on the API team for the real path
 export function resendVerification(email: string) {
   return post('/resendVerification', { email })
 }
 
-export function setNewPassword(email: string, token: string, password: string) {
-  return post('/setNewPassword', { email, token, password })
+export function setNewPassword(token: string, password: string, passwordConfirmation: string) {
+  return post('/resetPassword', { token, password, password_confirmation: passwordConfirmation })
 }
 
 export function saveToken(token: string) {

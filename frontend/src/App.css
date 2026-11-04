@@ -1,18 +1,19 @@
 :root {
   --teal: #0e7c7b;
   --teal-dark: #0a6463;
-  --teal-soft: #e3f3f1;
-  --ink: #141a2e;
-  --muted: #5b6275;
-  --line: #d9dce6;
-  --bg: #f5f6fa;
+  --teal-soft: #e4f2f0;
+  --ink: #14302f;
+  --muted: #566b69;
+  --line: #cdd9d7;
+  --bg: #f3f6f5;
   --card: #ffffff;
-  --coral-soft: #fde8e2;
-  --coral: #c2412d;
+  --coral-soft: #fdeae3;
+  --coral: #bf4526;
   --purple-soft: #ece7fd;
   --purple: #5b2bc4;
   --error: #b42318;
-  --radius: 12px;
+  --radius: 10px;
+  --line-soft: #e1e8e6;
 }
 
 * {
@@ -113,7 +114,7 @@ h2 {
 .card {
   width: 100%;
   background: var(--card);
-  border: 1px solid #e6e8ef;
+  border: 1px solid var(--line-soft);
   border-radius: 20px;
   box-shadow: 0 8px 30px rgba(20, 26, 46, 0.06);
 }
@@ -144,7 +145,7 @@ h2 {
   gap: 4px;
   margin: 28px 0 8px;
   padding: 4px;
-  background: #eef0f5;
+  background: #e9eeed;
   border-radius: var(--radius);
 }
 
@@ -347,7 +348,7 @@ h2 {
   align-items: flex-start;
   margin-top: 24px;
   padding-top: 24px;
-  border-top: 1px solid #e6e8ef;
+  border-top: 1px solid var(--line-soft);
 }
 
 .participant-note p {
@@ -380,7 +381,7 @@ h2 {
 
 .top-bar {
   padding: 18px 48px;
-  border-bottom: 1px solid #e6e8ef;
+  border-bottom: 1px solid var(--line-soft);
   background: #fff;
 }
 
@@ -529,4 +530,10 @@ h2 {
   .page-body {
     padding: 28px 16px;
   }
+}
+
+.dev-hint {
+  display: block;
+  margin-top: 10px;
+  text-align: center;
 }
