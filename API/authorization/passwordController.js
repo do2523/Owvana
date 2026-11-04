@@ -19,7 +19,7 @@ export async function forgotPassword(req, res)
             {
                 const token = crypto.randomBytes(32).toString('hex');
                 user.reset_token_hash = crypto.createHash('sha256').update(token).digest('hex');
-                user.rest_expires_at = Date.now() + 24 * 60 * 60* 1000;
+                user.reset_expires_at = Date.now() + 24 * 60 * 60* 1000;
                 await user.save();
 
                 console.log(`http://localhost:5000/API/authorization/reset-password?token=${token}`)

@@ -1,8 +1,5 @@
-import express from 'express';
 import crypto from 'crypto';
 import User from '../../backend/database/models/User.js'
-
-const router = express.Router();
 
 export async function register(req, res) 
 {
@@ -32,6 +29,7 @@ export async function register(req, res)
                 }
 
             const userExists = await User.findOne({email});
+            
             if(userExists)
                 {
                     return res.status(409).json({message: "User already exists"});

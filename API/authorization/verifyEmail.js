@@ -1,4 +1,3 @@
-import express from 'express';
 import crypto from 'crypto';
 import User from '../../backend/database/models/User.js'
 
