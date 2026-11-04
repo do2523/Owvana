@@ -29,7 +29,7 @@ export async function register(req, res)
                 }
 
             const userExists = await User.findOne({email});
-            
+
             if(userExists)
                 {
                     return res.status(409).json({message: "User already exists"});
@@ -50,3 +50,5 @@ export async function register(req, res)
             res.status(500).json({message: "Server error"})
         }
 }
+
+module.exports = { register };
