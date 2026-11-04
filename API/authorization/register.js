@@ -4,12 +4,13 @@ import User from '../../backend/database/models/User.js'
 
 const router = express.Router();
 
-router.post('/register', async(req, res) => 
-    {
-        const{name, email, password, password_confirmation} = req.body;
+export async function register(req, res) 
+{
 
         try
         {
+            const{name, email, password, password_confirmation} = req.body;
+
             if(!name || !email || !password || !password_confirmation)
                 {
                     return res.status(400).json({message: "Missing fields"});
@@ -41,7 +42,7 @@ router.post('/register', async(req, res) =>
 
             const user = await User.create({name, email, password, verify_token_hash, verify_expires_at: Date.now() + 24 * 60 * 60* 1000});
 
-            console.log(`http://localhost:3000/API/auth/verifyEmail?token=${token}`);
+            console.log(`http://localhost:5000/API/authorization/verifyEmail?token=${token}`);
 
             res.status(201).json({id: user._id, name: user.name, email: user.email})
         }
@@ -50,6 +51,4 @@ router.post('/register', async(req, res) =>
             console.error(err);
             res.status(500).json({message: "Server error"})
         }
-});
-
-export default router;
+}

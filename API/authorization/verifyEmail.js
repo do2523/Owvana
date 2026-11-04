@@ -2,13 +2,12 @@ import express from 'express';
 import crypto from 'crypto';
 import User from '../../backend/database/models/User.js'
 
-const router = express.Router();
-
-router.get('/verifyEmail', async(req, res) => 
+export async function verifyEmail(req, res)
     {
         try
         {
             const {token} = req.query;
+
             if(!token)
                 {
                     return res.status(400).json({message: "Missing token"});
@@ -35,7 +34,4 @@ router.get('/verifyEmail', async(req, res) =>
             console.error(err);
             res.status(500).json({message: "Server error"});
         }
-       
-    });
-
-export default router;
+}
