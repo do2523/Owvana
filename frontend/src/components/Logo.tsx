@@ -1,3 +1,6 @@
+import { getToken } from '../api'
+import { navigate } from '../router'
+
 type Props = { light?: boolean }
 
 // split pin, teal half + coral half
@@ -14,7 +17,14 @@ export function PinIcon() {
 
 export default function Logo({ light }: Props) {
   return (
-    <a href="/login" className={light ? 'logo logo-light' : 'logo'}>
+    <a
+      href="/dashboard"
+      className={light ? 'logo logo-light' : 'logo'}
+      onClick={(e) => {
+        e.preventDefault()
+        navigate(getToken() ? '/dashboard' : '/login')
+      }}
+    >
       <span className="logo-mark">
         <PinIcon />
       </span>

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import TopBar from '../components/TopBar'
 import { verifyEmail } from '../api'
 import { navigate } from '../router'
+import { verifyLocal } from '../store'
 
 type Status = 'checking' | 'verified' | 'failed'
 
@@ -16,6 +17,11 @@ export default function VerifyEmailPage({ email, token }: { email: string; token
     verifyEmail(token)
       .then((res) => {
         if (cancelled) return
+        // backend off in local testing
+        if (import.meta.env.DEV && res.status >= 500) {
+          setStatus(verifyLocal(email) ? 'verified' : 'failed')
+          return
+        }
         // api list says this gives back true/false, so handle a bare boolean too
         const body = res.data as unknown
         const ok = res.ok && body !== false && res.data?.verified !== false
@@ -26,7 +32,7 @@ export default function VerifyEmailPage({ email, token }: { email: string; token
     return () => {
       cancelled = true
     }
-  }, [token])
+  }, [email, token])
 
   return (
     <div className="page">
