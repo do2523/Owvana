@@ -12,8 +12,9 @@ export async function verifyEmail(req, res)
                     return res.status(400).json({message: "Missing token"});
                 }
             
-            
-            const user = await User.findOne({token, verify_expires_at: {$gt: Date.now()}});
+            const verify_token_hash = crypto.createHash('sha256').update(token).digest('hex');
+
+            const user = await User.findOne({verify_token_hash, verify_expires_at: {$gt: Date.now()}});
 
             if(!user)
                 {
