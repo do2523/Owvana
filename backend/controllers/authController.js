@@ -1,6 +1,6 @@
 import bcrypt from 'bcrypt';
-const crypto = require("node:crypto");
-const User = require("../database/models/User");
+import crypto from 'crypto';
+import User from '../../backend/database/models/User.js'
 
 function hashPassword(password) {
     return new Promise((resolve, reject) => {
