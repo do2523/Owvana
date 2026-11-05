@@ -42,11 +42,18 @@ async function register(req, res, next) {
             return;
         }
 
+        const token = crypto.randomBytes(32).toString('hex');
+        const verify_token_hash = crypto.createHash('sha256').update(token).digest('hex');
+
         const user = await User.create({
             name: name.trim(),
             email: normalizedEmail,
             password_hash: await hashPassword(password),
+            verify_token_hash,
+            verify_expires_at: Date.now() + 24 * 60 * 60* 1000
         });
+
+        console.log(`http://localhost:5000/API/authorization/verifyEmail?token=${token}`);
 
         res.status(201).json({
             message: "Account created successfully.",
