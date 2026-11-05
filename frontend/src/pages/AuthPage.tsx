@@ -134,8 +134,6 @@ function LoginForm({ onSignup }: { onSignup: () => void }) {
         {isSubmitting ? 'Logging in...' : 'Log in'}
       </button>
 
-      {import.meta.env.DEV && <p className="hint dev-hint">Local testing: with the backend off, any password works and a new email opens the demo account.</p>}
-
       <p className="switch-line">
         New here?{' '}
         <button type="button" className="link" onClick={onSignup}>
