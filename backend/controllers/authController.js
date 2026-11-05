@@ -53,9 +53,11 @@ async function register(req, res, next) {
             verify_expires_at: Date.now() + 24 * 60 * 60* 1000
         });
 
+        console.log(`http://localhost:5000/API/authorization/verifyEmail?token=${token}`);
+
         res.status(201).json({
             message: "Account created successfully.",
-            user: { id: user._id, name: user.name, email: user.email },
+            user: { id: user._id, name: user.name, email: user.email, token: user.verify_token_hash },
         });
     } catch (error) {
         next(error);
