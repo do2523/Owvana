@@ -1,3 +1,4 @@
+import bcrypt from 'bcrypt';
 const crypto = require("node:crypto");
 const User = require("../database/models/User");
 
