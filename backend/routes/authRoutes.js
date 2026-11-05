@@ -1,9 +1,9 @@
 const express = require("express");
 const { register } = require("../controllers/authController");
 const { login } = require("../../API/authorization/login");
-const { verifyEmail } = require("../../API/authorization/verifyEmail");
-const { resetPassword } = require("../../API/authorization/passwordController");
-const { forgotPassword } = require("../../API/authorization/passwordController");
+const { verifyEmail } = require("../controllers/authController");
+const { resetPassword } = require("../controllers/authController");
+const { forgotPassword } = require("../controllers/authController");
 
 const router = express.Router();
 
