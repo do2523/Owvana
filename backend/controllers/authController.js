@@ -187,8 +187,4 @@ async function resetPassword(req, res)
     }
 }
 
-
-module.exports = { register };
-module.exports = { verifyEmail };
-module.exports = { forgotPassword };
-module.exports = { resetPassword };
+module.exports = { register, verifyEmail, forgotPassword, resetPassword };
