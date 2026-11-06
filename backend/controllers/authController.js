@@ -1,3 +1,4 @@
+const bcrypt = require("bcrypt");
 const crypto = require("node:crypto");
 const User = require("../database/models/User");
 
@@ -173,7 +174,7 @@ async function resetPassword(req, res)
                 return res.status(400).json({message: "New password cannot be the same as your old password"});
             }
         
-        user.password = await hashPassword(password);
+        user.password_hash = await hashPassword(password);
         user.reset_token_hash = undefined;
         user.reset_expires_at = undefined;
         await user.save();
