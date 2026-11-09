@@ -19,7 +19,7 @@ async function createCatergory(req, res)
                 return res.status(400).json({message: "Group wasn't found"});
             }
             
-        const category = await Category.create({name, group_id: group.owner_id});
+        const category = await Category.create({name, group_id: group._id});
 
         if(!category)
             {
@@ -39,18 +39,18 @@ async function deleteCategory(req, res)
 {
     try
     {
-        const{id, group_id} = req.params;
+        const{category_id, group_id} = req.params;
 
-         if(!id || !group_id)
+         if(!category_id || !group_id)
             {
-                 return res.status(400).json({message: "Missing fields"});
+                return res.status(400).json({message: "Missing fields"});
             }
 
-        const category = await Category.findOneAndDelete({_id: id, group_id})
+        const category = await Category.findOneAndDelete({_id: category_id, group_id})
 
         if(!category)
             {
-                res.status(400).json({message: "Category not found"});
+                return res.status(400).json({message: "Category not found"});
             }
         
         
