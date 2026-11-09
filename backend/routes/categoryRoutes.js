@@ -3,6 +3,6 @@ const { createCatergory, deleteCategory} = require("../controllers/categoryContr
 const router = express.Router();
 
 router.post('/createCategory', createCatergory);
-router.delete('/deleteCategory/:group_id/:id', deleteCategory);
+router.delete('/deleteCategory/:group_id/:category_id', deleteCategory);
 
 module.exports = router;
