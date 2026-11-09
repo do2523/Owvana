@@ -5,6 +5,7 @@ const categoryRoutes = require("./routes/categoryRoutes");
 const groupRoutes = require("./routes/groupRoutes");
 const expenseRoutes = require("./routes/expenseRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
+const userRoutes = require("./routes/userRoutes");
 const errorHandler = require("./middleware/errorHandler");
 
 const app = express();
@@ -14,8 +15,7 @@ app.use(express.json());
 app.use("/", authRoutes);
 app.use("/", categoryRoutes);
 app.use("/", groupRoutes);
-app.use("/", expenseRoutes);
-app.use("/", paymentRoutes);
+app.use("/", userRoutes);
 app.use(errorHandler);
 
 module.exports = app;
