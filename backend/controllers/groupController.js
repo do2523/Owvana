@@ -90,6 +90,14 @@ async function addToGroup(req, res)
             }
 
         const normalizedEmail = email.trim().toLowerCase();
+
+        const existingParticipant = await Participant.findOne({email: normalizedEmail});
+
+        if(existingParticipant)
+            {
+                return res.status(409).json({ message: "A participant in the group already has that email" });
+            }
+
         const token = crypto.randomBytes(32).toString('hex');
         const access_token_hash = crypto.createHash('sha256').update(token).digest('hex');
 
@@ -125,14 +133,14 @@ async function removeFromGroup(req, res)
 {
     try
     {
-        const{participant_id} = req.params;
+        const{participant_id, group_id} = req.params;
 
-        if(!participant_id)
+        if(!participant_id || !group_id)
             {
                 return res.status(400).json({message: "Missing fields"});
             }
 
-        const participant = await Participant.findByIdAndDelete(participant_id);
+        const participant = await Participant.findOneAndDelete({_id: participant_id, group_id});
 
         if(!participant)
         {
