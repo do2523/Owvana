@@ -17,6 +17,12 @@ const expenseSplitSchema = new mongoose.Schema({
     amount_owed: {
         type: Number,
         required: true
+    },
+
+    // the percent / share count / exact amount that was typed in
+    split_value: {
+        type: Number,
+        default: 0
     }
 
 }, {

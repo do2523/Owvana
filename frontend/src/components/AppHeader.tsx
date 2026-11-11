@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import Logo from './Logo'
-import { clearToken } from '../api'
 import { navigate } from '../router'
-import { resetLocalData } from '../store'
+import { logOut } from '../store'
 import { initials } from '../utils'
 
 type Props = { userName: string; active: 'groups' | 'profile' }
@@ -11,8 +10,8 @@ type Props = { userName: string; active: 'groups' | 'profile' }
 export default function AppHeader({ userName, active }: Props) {
   const [menuOpen, setMenuOpen] = useState(false)
 
-  function logOut() {
-    clearToken()
+  function handleLogOut() {
+    logOut()
     navigate('/login')
   }
 
@@ -38,17 +37,7 @@ export default function AppHeader({ userName, active }: Props) {
           <div className="avatar-menu">
             <p className="avatar-name">{userName}</p>
             <button onClick={() => navigate('/profile')}>Profile</button>
-            <button onClick={logOut}>Log out</button>
-            {import.meta.env.DEV && (
-              <button
-                onClick={() => {
-                  resetLocalData()
-                  logOut()
-                }}
-              >
-                Reset sample data
-              </button>
-            )}
+            <button onClick={handleLogOut}>Log out</button>
           </div>
         )}
       </div>

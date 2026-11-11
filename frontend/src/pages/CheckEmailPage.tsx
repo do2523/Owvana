@@ -22,7 +22,7 @@ export default function CheckEmailPage({ email }: { email: string }) {
     setIsSubmitting(true)
     try {
       const res = await resendVerification(email)
-      if (!res.ok && !(import.meta.env.DEV && res.status >= 500)) {
+      if (!res.ok) {
         setStatus(res.data.message ?? 'Couldn’t resend the email. Try again later.')
         return
       }
@@ -66,11 +66,6 @@ export default function CheckEmailPage({ email }: { email: string }) {
           <button className="btn btn-outline" onClick={handleResend} disabled={isSubmitting || secondsLeft > 0 || !email}>
             {isSubmitting ? 'Sending...' : 'Resend email'}
           </button>
-          {import.meta.env.DEV && email && (
-            <button className="link" onClick={() => navigate(`/verify-email?email=${encodeURIComponent(email)}&token=local`)}>
-              Local testing: open the verification link
-            </button>
-          )}
           <button className="link" onClick={() => navigate('/login')}>
             Back to log in
           </button>

@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const authRoutes = require("./routes/authRoutes");
+const dataRoutes = require("./routes/dataRoutes");
 const categoryRoutes = require("./routes/categoryRoutes");
 const groupRoutes = require("./routes/groupRoutes");
 const expenseRoutes = require("./routes/expenseRoutes");
@@ -16,6 +17,7 @@ app.use("/", authRoutes);
 app.use("/", categoryRoutes);
 app.use("/", groupRoutes);
 app.use("/", userRoutes);
+app.use("/", dataRoutes);
 app.use(errorHandler);
 
 module.exports = app;

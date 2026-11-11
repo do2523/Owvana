@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import './App.css'
 import { useLocation } from './router'
 import AuthPage from './pages/AuthPage'
@@ -13,7 +14,7 @@ import GroupCategoriesPage from './pages/GroupCategoriesPage'
 import ParticipantLinkPage from './pages/ParticipantLinkPage'
 import ProfilePage from './pages/ProfilePage'
 import { getToken } from './api'
-import { currentUser, useDb } from './store'
+import { currentUser, dismissSyncError, lastSyncError, loadOwnerData, sessionStatus, useDb } from './store'
 
 // /groups/:id and everything under it
 function GroupRoutes({ parts }: { parts: string[] }) {
@@ -29,16 +30,74 @@ function GroupRoutes({ parts }: { parts: string[] }) {
   return <GroupExpensesPage key={group._id} group={group} />
 }
 
+// shown when a change couldnt be saved to the database. the page has already gone back to what is saved
+function SyncErrorBanner() {
+  const message = lastSyncError()
+  if (!message) return null
+  return (
+    <div className="sync-error" role="alert">
+      <span>{message}</span>
+      <button onClick={dismissSyncError} aria-label="Dismiss">×</button>
+    </div>
+  )
+}
+
 function App() {
+  useDb()
   const { path, query } = useLocation()
   const email = query.get('email') ?? ''
   const token = query.get('token') ?? ''
   const parts = path.split('/').filter(Boolean)
-  const loggedIn = Boolean(getToken()) && Boolean(currentUser())
+  const isLinkPage = parts[0] === 'p' && Boolean(parts[1])
+  const needsLogin = (parts[0] === 'groups' && Boolean(parts[1])) || path === '/dashboard' || path === '/profile'
+  const hasToken = Boolean(getToken())
+  const state = sessionStatus()
+  const loggedIn = hasToken && Boolean(currentUser())
+
+  // pull the user's data from the database once they are logged in
+  useEffect(() => {
+    if (!isLinkPage && hasToken) void loadOwnerData()
+  }, [isLinkPage, hasToken, path])
 
   // this one is public, people open it without an account
-  if (parts[0] === 'p' && parts[1]) return <ParticipantLinkPage token={parts[1]} />
+  if (isLinkPage) {
+    return (
+      <>
+        <ParticipantLinkPage token={parts[1]} />
+        <SyncErrorBanner />
+      </>
+    )
+  }
 
+  if (needsLogin && hasToken && !loggedIn) {
+    if (state === 'failed') {
+      return (
+        <main className="link-missing">
+          <h1>Can’t reach the server</h1>
+          <p className="muted">Make sure the backend is running, then try again.</p>
+          <button className="btn btn-primary btn-auto" onClick={() => void loadOwnerData(true)}>Try again</button>
+        </main>
+      )
+    }
+    return (
+      <main className="link-missing">
+        <p className="muted">Loading your groups...</p>
+      </main>
+    )
+  }
+
+  return (
+    <>
+      <Page path={path} parts={parts} email={email} token={token} loggedIn={loggedIn} />
+      <SyncErrorBanner />
+    </>
+  )
+}
+
+type PageProps = { path: string; parts: string[]; email: string; token: string; loggedIn: boolean }
+
+// picks the page for the current url
+function Page({ path, parts, email, token, loggedIn }: PageProps) {
   if (parts[0] === 'groups' && parts[1]) {
     return loggedIn ? <GroupRoutes parts={parts} /> : <AuthPage key="login" startTab="login" />
   }

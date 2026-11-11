@@ -2,9 +2,9 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import TopBar from '../components/TopBar'
 import PasswordChecklist from '../components/PasswordChecklist'
-import { login, passwordProblem, saveToken, sendResetLink, setNewPassword } from '../api'
+import { login, passwordProblem, sendResetLink, setNewPassword } from '../api'
 import { navigate } from '../router'
-import { loginLocal } from '../store'
+import { beginSession } from '../store'
 
 // without a token you just ask for the link, the link brings you back here with ?email=&token=
 export default function ResetPasswordPage({ email: emailFromLink, token }: { email: string; token: string }) {
@@ -23,11 +23,6 @@ export default function ResetPasswordPage({ email: emailFromLink, token }: { ema
     setIsSending(true)
     try {
       const res = await sendResetLink(email.trim())
-      // backend off in local testing, so just jump to the link the email would have had
-      if (import.meta.env.DEV && res.status >= 500) {
-        navigate(`/reset-password?email=${encodeURIComponent(email.trim())}&token=local`)
-        return
-      }
       // say the same thing either way so people cant fish for which emails have accounts
       setSendStatus(
         res.ok || res.status === 404
@@ -59,16 +54,6 @@ export default function ResetPasswordPage({ email: emailFromLink, token }: { ema
     try {
       const res = await setNewPassword(token, password, confirm)
 
-      if (import.meta.env.DEV && res.status >= 500) {
-        if (loginLocal(email.trim())) {
-          saveToken('dev-token')
-          navigate('/dashboard')
-        } else {
-          navigate('/login')
-        }
-        return
-      }
-
       if (!res.ok) {
         setSaveError(res.data.message ?? 'That reset link expired. Send a new one above.')
         return
@@ -77,7 +62,7 @@ export default function ResetPasswordPage({ email: emailFromLink, token }: { ema
       // "save and log in" so try logging in right away
       const loginRes = await login(email.trim(), password)
       if (loginRes.ok && loginRes.data.token) {
-        saveToken(loginRes.data.token)
+        beginSession(loginRes.data.token)
         navigate('/dashboard')
       } else {
         navigate('/login')

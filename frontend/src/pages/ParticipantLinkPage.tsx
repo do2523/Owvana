@@ -1,19 +1,43 @@
+import { useEffect } from 'react'
 import { PinIcon } from '../components/Logo'
 import { GroupScene } from '../components/Scenes'
 import { sceneFor, useGroupTheme } from '../groupTheme'
 import { LockSimple } from '@phosphor-icons/react'
 import SendPaymentForm from '../components/SendPaymentForm'
 import { Avatar, CategoryTag, CheckIcon, StatusBadge } from '../components/ui'
-import { confirmPayment, debtsFrom, debtsTo, firstName, groupCategories, ownerParticipant, participantBalance, participantName, participantShare, paymentTo, useDb } from '../store'
+import { confirmPayment, debtsFrom, debtsTo, firstName, groupCategories, loadLink, ownerParticipant, participantBalance, participantName, participantShare, paymentTo, sessionStatus, useDb } from '../store'
 import { money, shortDate, timeAgo } from '../utils'
 import './Group.css'
 
 // the private page people open from their link. no login on purpose
 export default function ParticipantLinkPage({ token }: { token: string }) {
   const db = useDb()
+  const state = sessionStatus()
   const me = db.participants.find((p) => p.access_token === token)
   const group = db.groups.find((g) => g._id === me?.group_id)
   useGroupTheme(group ? sceneFor(group) : '')
+
+  // the link itself is the login, so ask the backend for everything this person may see
+  useEffect(() => {
+    void loadLink(token)
+  }, [token])
+
+  if (state !== 'link' && state !== 'failed') {
+    return (
+      <main className="link-missing">
+        <p className="muted">Loading your share...</p>
+      </main>
+    )
+  }
+
+  if (state === 'failed') {
+    return (
+      <main className="link-missing">
+        <h1>Can’t reach the server</h1>
+        <p className="muted">Check your connection and refresh the page.</p>
+      </main>
+    )
+  }
 
   if (!me || !group) {
     return (

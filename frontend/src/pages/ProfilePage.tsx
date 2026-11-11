@@ -2,9 +2,9 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import AppHeader from '../components/AppHeader'
 import { Avatar, CheckIcon } from '../components/ui'
-import { clearToken, sendResetLink } from '../api'
+import { sendResetLink } from '../api'
 import { navigate } from '../router'
-import { currentUser, updateProfile, useDb } from '../store'
+import { currentUser, logOut, updateProfile, useDb } from '../store'
 import { longDate } from '../utils'
 import './Group.css'
 
@@ -19,9 +19,8 @@ export default function ProfilePage() {
   const [saved, setSaved] = useState('')
   const [error, setError] = useState('')
   const [resetStatus, setResetStatus] = useState('')
-  const [resetLink, setResetLink] = useState('')
 
-  function handleSave(event: FormEvent<HTMLFormElement>) {
+  async function handleSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setSaved('')
     setError('')
@@ -29,29 +28,24 @@ export default function ProfilePage() {
       setError('That email doesn’t look right.')
       return
     }
-    updateProfile(`${first.trim()} ${last.trim()}`.trim(), email.trim())
-    setSaved('Saved.')
+    const problem = await updateProfile(`${first.trim()} ${last.trim()}`.trim(), email.trim())
+    if (problem) setError(problem)
+    else setSaved('Saved.')
   }
 
   async function handleReset() {
     setResetStatus('')
-    setResetLink('')
     const address = user?.email ?? ''
     try {
       const res = await sendResetLink(address)
-      if (import.meta.env.DEV && res.status >= 500) {
-        setResetStatus('Local testing: no email goes out with the backend off.')
-        setResetLink(`/reset-password?email=${encodeURIComponent(address)}&token=local`)
-      } else {
-        setResetStatus(res.ok ? `Reset link sent to ${address}.` : (res.data.message ?? 'Couldn’t send the link. Try again later.'))
-      }
+      setResetStatus(res.ok ? `Reset link sent to ${address}.` : (res.data.message ?? 'Couldn’t send the link. Try again later.'))
     } catch {
       setResetStatus('Can’t reach the server right now. Try again in a sec.')
     }
   }
 
-  function logOut() {
-    clearToken()
+  function handleLogOut() {
+    logOut()
     navigate('/login')
   }
 
@@ -103,12 +97,11 @@ export default function ProfilePage() {
             <h2 className="panel-title">Password</h2>
             <p className="muted">We’ll email you a link to set a new one.</p>
             {resetStatus && <p className="form-status" role="status">{resetStatus}</p>}
-            {resetLink && <button className="link" onClick={() => navigate(resetLink)}>Open the reset page</button>}
           </div>
           <button className="btn btn-outline btn-auto" onClick={handleReset}>Send reset link</button>
         </section>
 
-        <button className="btn-logout" onClick={logOut}>Log out</button>
+        <button className="btn-logout" onClick={handleLogOut}>Log out</button>
       </main>
     </div>
   )

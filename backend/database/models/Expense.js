@@ -33,6 +33,12 @@ const expenseSchema = new mongoose.Schema({
         required: true
     },
 
+    split_type: {
+        type: String,
+        enum: ["equal", "exact", "percent", "shares"],
+        default: "equal"
+    },
+
     created_at: {
         type: Date,
         default: Date.now

@@ -2,7 +2,7 @@
 
 type ApiResult<T> = { ok: boolean; status: number; data: T & { message?: string } }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<ApiResult<T>> {
+export async function request<T>(path: string, options: RequestInit = {}): Promise<ApiResult<T>> {
   // send the login token along if we have one
   const token = getToken()
   const response = await fetch(path, {
@@ -34,8 +34,16 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<ApiR
   return { ok: response.ok, status: response.status, data }
 }
 
-function post<T>(path: string, body: unknown) {
+export function post<T>(path: string, body: unknown) {
   return request<T>(path, { method: 'POST', body: JSON.stringify(body) })
+}
+
+export function put<T>(path: string, body: unknown) {
+  return request<T>(path, { method: 'PUT', body: JSON.stringify(body) })
+}
+
+export function del<T>(path: string) {
+  return request<T>(path, { method: 'DELETE' })
 }
 
 // API branch version of /register wants password_confirmation too
@@ -53,9 +61,17 @@ export function login(email: string, password: string) {
 }
 
 // the link in the email has ?token=... on it
+// the token is single use, so reuse one request per token (React StrictMode runs effects twice in dev)
+const verifyRequests = new Map<string, ReturnType<typeof request<{ verified?: boolean }>>>()
+
 export function verifyEmail(token: string) {
-  const params = new URLSearchParams({ token })
-  return request<{ verified?: boolean }>(`/verifyEmail?${params}`)
+  let pending = verifyRequests.get(token)
+  if (!pending) {
+    const params = new URLSearchParams({ token })
+    pending = request<{ verified?: boolean }>(`/verifyEmail?${params}`)
+    verifyRequests.set(token, pending)
+  }
+  return pending
 }
 
 // these two match forgotPassword and resetPassword in API/authorization/passwordController.js

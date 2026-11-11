@@ -1,11 +1,12 @@
 import { useSyncExternalStore } from 'react'
 import { allocate } from './utils'
-import { buildSeed } from './seed'
+import { clearToken, del, getToken, post, put, request, saveToken } from './api'
 
-// everything the app shows comes from here for now. its saved in the browser (localStorage)
-// because the API teams routes arent ready. field names match the mongoose models in
-// backend/database/models, and the function names match the API list where theres a route for it.
-// when the routes are done these are the functions to swap for real fetch calls.
+// The app's data lives in MongoDB. This file keeps a copy in memory so the pages can stay simple:
+//  - loadOwnerData() / loadLink() fill it from the backend
+//  - every function below that changes something updates the copy right away, then sends the
+//    change to the backend. if the backend says no, the copy is reloaded and an error is shown.
+// field names match the mongoose models in backend/database/models.
 
 export type User = { _id: string; name: string; email: string; email_verified: boolean; created_at: string }
 // scene isnt in the model yet, its the background picked in the edit popup
@@ -53,54 +54,37 @@ export type Db = {
   payments: Payment[]
 }
 
-const KEY = 'owvana-data-v3'
 export const TAG_COLORS = ['#2b7f9e', '#e4703a', '#8a5a8c', '#14a08f', '#c94f7c']
 
+// ids are made here so a new thing can show up before the backend answers.
+// 24 hex characters = a valid MongoDB ObjectId, the backend keeps the one we send
 export function newId() {
-  return crypto.randomUUID()
+  return Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => b.toString(16).padStart(2, '0')).join('')
 }
 
-// looks like q91xz-7hm2
-export function newLinkToken() {
-  const chars = 'abcdefghjkmnpqrstuvwxyz23456789'
-  const pick = (n: number) => Array.from(crypto.getRandomValues(new Uint32Array(n)), (x) => chars[x % chars.length]).join('')
-  return `${pick(5)}-${pick(4)}`
+// stand in until the backend answers with the real private link token
+function placeholderToken() {
+  return `pending-${newId()}`
 }
 
 function emptyDb(): Db {
-  return {
-    currentUserId: '',
-    users: [],
-    groups: [],
-    participants: [],
-    categories: [
-      { _id: 'cat-lodging', name: 'Lodging', group_id: null, color: TAG_COLORS[0] },
-      { _id: 'cat-food', name: 'Food', group_id: null, color: TAG_COLORS[1] },
-      { _id: 'cat-transport', name: 'Transport', group_id: null, color: TAG_COLORS[2] },
-    ],
-    expenses: [],
-    expense_splits: [],
-    payments: [],
-  }
+  return { currentUserId: '', users: [], groups: [], participants: [], categories: [], expenses: [], expense_splits: [], payments: [] }
 }
 
-function load(): Db {
-  try {
-    const saved = localStorage.getItem(KEY)
-    if (saved) return JSON.parse(saved) as Db
-  } catch {
-    // bad data, just start over
-  }
-  // the fake trips are only for npm run dev
-  return import.meta.env.DEV ? buildSeed(emptyDb()) : emptyDb()
-}
+// ---- loading + syncing with the backend ----
 
-let db = load()
+// idle = nothing loaded, loading = waiting on the backend, owner = a logged in user's data,
+// link = a participant's private link page, failed = couldnt reach the backend
+export type Status = 'idle' | 'loading' | 'owner' | 'link' | 'failed'
+
+let db = emptyDb()
+let status: Status = 'idle'
+let linkToken = ''
+let syncError = ''
 let version = 0
 const listeners = new Set<() => void>()
 
-function save() {
-  localStorage.setItem(KEY, JSON.stringify(db))
+function notify() {
   version += 1
   listeners.forEach((listener) => listener())
 }
@@ -118,10 +102,114 @@ export function useDb() {
   return db
 }
 
-export function resetLocalData() {
-  localStorage.removeItem(KEY)
-  db = load()
-  save()
+export function sessionStatus() {
+  return status
+}
+
+export function lastSyncError() {
+  return syncError
+}
+
+export function dismissSyncError() {
+  syncError = ''
+  notify()
+}
+
+type OwnerPayload = Omit<Db, 'currentUserId' | 'users'> & { user: User }
+type LinkPayload = Omit<Db, 'currentUserId' | 'users' | 'groups'> & { group: Group }
+
+// loads the logged in user's groups, people, expenses and payments
+export async function loadOwnerData(force = false) {
+  if (!getToken()) return
+  if (status === 'loading' || (status === 'owner' && !force)) return
+  status = 'loading'
+  notify()
+
+  try {
+    const res = await request<OwnerPayload>('/data')
+    if (res.status === 401) {
+      // token is old or the account is gone
+      clearToken()
+      db = emptyDb()
+      status = 'idle'
+    } else if (!res.ok) {
+      status = 'failed'
+    } else {
+      const { user, ...rest } = res.data
+      db = { ...rest, currentUserId: user._id, users: [user] }
+      status = 'owner'
+    }
+  } catch {
+    status = 'failed'
+  }
+  notify()
+}
+
+// loads what one participant is allowed to see from their private link
+export async function loadLink(token: string, force = false) {
+  if (status === 'loading' || (status === 'link' && linkToken === token && !force)) return
+  status = 'loading'
+  notify()
+
+  try {
+    const res = await request<LinkPayload>(`/link/${encodeURIComponent(token)}`)
+    if (res.ok) {
+      const { group, ...rest } = res.data
+      db = { ...rest, currentUserId: '', users: [], groups: [group] }
+    } else if (res.status === 404) {
+      db = emptyDb()
+    } else {
+      status = 'failed'
+      notify()
+      return
+    }
+    linkToken = token
+    status = 'link'
+  } catch {
+    status = 'failed'
+  }
+  notify()
+}
+
+function reload() {
+  return status === 'link' ? loadLink(linkToken, true) : loadOwnerData(true)
+}
+
+// changes go to the backend one at a time, in order, so a group exists before its people are added
+let queue: Promise<void> = Promise.resolve()
+
+type Result = { ok: boolean; data: { message?: string } }
+
+function sync(task: () => Promise<Result>) {
+  queue = queue
+    .then(async () => {
+      const res = await task()
+      if (!res.ok) throw new Error(res.data?.message ?? 'The server rejected that change.')
+    })
+    .catch(async (error: unknown) => {
+      syncError = error instanceof Error && error.message ? error.message : 'Couldn’t save that change. Check your connection.'
+      await reload()
+    })
+}
+
+// a brand new login. forget whatever was loaded before
+export function beginSession(token: string) {
+  saveToken(token)
+  db = emptyDb()
+  status = 'idle'
+  linkToken = ''
+  syncError = ''
+  notify()
+}
+
+export function logOut() {
+  clearToken()
+  db = emptyDb()
+  status = 'idle'
+  linkToken = ''
+  syncError = ''
+  queue = Promise.resolve()
+  notify()
 }
 
 // ---- accounts ----
@@ -130,58 +218,19 @@ export function currentUser() {
   return db.users.find((u) => u._id === db.currentUserId)
 }
 
-// local stand in for /register while the backend is off
-export function registerLocal(name: string, email: string) {
-  const address = email.toLowerCase()
-  const existing = db.users.find((u) => u.email === address)
-  if (existing) return false
-  db.users.push({ _id: newId(), name, email: address, email_verified: false, created_at: new Date().toISOString() })
-  save()
-  return true
-}
+// returns a message if it didnt work. waits for the backend because the email might already be taken
+export async function updateProfile(name: string, email: string) {
+  const res = await put<{ user?: User }>('/updateProfile', { name, email })
+  if (!res.ok || !res.data.user) return res.data.message ?? 'Couldn’t save your profile.'
 
-// local stand in for /login. false means the email isnt verified yet
-export function loginLocal(email: string) {
-  const user = db.users.find((u) => u.email === email.toLowerCase()) ?? db.users[0]
-  if (!user) return false
-  if (!user.email_verified) return false
-  db.currentUserId = user._id
-  save()
-  return true
-}
-
-export function verifyLocal(email: string) {
-  const user = db.users.find((u) => u.email === email.toLowerCase())
-  if (!user) return false
-  user.email_verified = true
-  save()
-  return true
-}
-
-// real login gives us a token but not the user yet, so remember who logged in
-export function rememberUser(email: string) {
-  const address = email.toLowerCase()
-  let user = db.users.find((u) => u.email === address)
-  if (!user) {
-    user = { _id: newId(), name: address.split('@')[0], email: address, email_verified: true, created_at: new Date().toISOString() }
-    db.users.push(user)
-  }
-  db.currentUserId = user._id
-  save()
-}
-
-export function updateProfile(name: string, email: string) {
-  const user = currentUser()
-  if (!user) return
-  const address = email.toLowerCase()
-  if (address !== user.email) user.email_verified = false
-  user.name = name
-  user.email = address
+  const user = res.data.user
+  db.users = db.users.map((u) => (u._id === user._id ? user : u))
   db.participants.filter((p) => p.user_id === user._id).forEach((p) => {
-    p.name = name
-    p.email = address
+    p.name = user.name
+    p.email = user.email
   })
-  save()
+  notify()
+  return ''
 }
 
 // ---- groups ----
@@ -189,17 +238,24 @@ export function updateProfile(name: string, email: string) {
 export function createGroup(name: string) {
   const user = currentUser()
   const group: Group = { _id: newId(), name, owner_id: user?._id ?? '', created_at: new Date().toISOString() }
-  db.groups.push(group)
-  // the owner needs a participant row too so they can have a share of expenses
-  db.participants.push({
+  const owner: Participant = {
     _id: newId(),
     name: user?.name ?? 'You',
     email: user?.email,
     group_id: group._id,
-    access_token: newLinkToken(),
+    access_token: placeholderToken(),
     user_id: user?._id,
+  }
+  // the owner needs a participant row too so they can have a share of expenses
+  db.groups.push(group)
+  db.participants.push(owner)
+  notify()
+
+  sync(async () => {
+    const res = await post<{ participant?: Participant }>('/createGroup', { _id: group._id, participant_id: owner._id, name })
+    if (res.ok && res.data.participant) takeToken(owner._id, res.data.participant.access_token)
+    return res
   })
-  save()
   return group
 }
 
@@ -208,10 +264,12 @@ export function updateGroup(groupId: string, name: string, scene: string) {
   if (!group) return
   group.name = name
   group.scene = scene
-  save()
+  notify()
+  sync(() => put(`/updateGroup/${groupId}`, { name, scene }))
 }
 
 export function deleteGroup(groupId: string) {
+  const ownerId = db.groups.find((g) => g._id === groupId)?.owner_id ?? db.currentUserId
   const expenseIds = new Set(db.expenses.filter((e) => e.group_id === groupId).map((e) => e._id))
   db.groups = db.groups.filter((g) => g._id !== groupId)
   db.participants = db.participants.filter((p) => p.group_id !== groupId)
@@ -219,7 +277,16 @@ export function deleteGroup(groupId: string) {
   db.expenses = db.expenses.filter((e) => e.group_id !== groupId)
   db.expense_splits = db.expense_splits.filter((s) => !expenseIds.has(s.expense_id))
   db.payments = db.payments.filter((p) => p.group_id !== groupId)
-  save()
+  notify()
+  sync(() => del(`/deleteGroup/${ownerId}/${groupId}`))
+}
+
+// the backend picks the real private link token, swap it in when it answers
+function takeToken(participantId: string, token: string) {
+  const person = db.participants.find((p) => p._id === participantId)
+  if (!person || !token) return
+  person.access_token = token
+  notify()
 }
 
 // ---- participants ----
@@ -230,10 +297,16 @@ export function addToGroup(groupId: string, name: string, email?: string) {
     name,
     email: email || undefined,
     group_id: groupId,
-    access_token: newLinkToken(),
+    access_token: placeholderToken(),
   }
   db.participants.push(participant)
-  save()
+  notify()
+
+  sync(async () => {
+    const res = await put<{ participant?: Participant }>(`/addToGroup/${groupId}`, { _id: participant._id, name, email: email || undefined })
+    if (res.ok && res.data.participant) takeToken(participant._id, res.data.participant.access_token)
+    return res
+  })
   return participant
 }
 
@@ -242,7 +315,8 @@ export function updateParticipant(id: string, name: string, email?: string) {
   if (!participant) return
   participant.name = name
   participant.email = email || undefined
-  save()
+  notify()
+  sync(() => put(`/updateParticipant/${id}`, { name, email: email || undefined }))
 }
 
 // cant remove someone who has money attached or the totals would stop adding up
@@ -253,7 +327,8 @@ export function removeFromGroup(id: string) {
     db.expenses.some((e) => e.paid_by === id)
   if (inUse) return false
   db.participants = db.participants.filter((p) => p._id !== id)
-  save()
+  notify()
+  sync(() => del(`/removeFromGroup/${id}`))
   return true
 }
 
@@ -266,7 +341,8 @@ export function groupCategories(groupId: string) {
 export function createCategory(groupId: string, name: string, color: string) {
   const category: Category = { _id: newId(), name, group_id: groupId, color }
   db.categories.push(category)
-  save()
+  notify()
+  sync(() => post('/createCategory', { _id: category._id, name, group_id: groupId, color }))
   return category
 }
 
@@ -274,17 +350,20 @@ export function renameCategory(id: string, name: string) {
   const category = db.categories.find((c) => c._id === id)
   if (!category || category.group_id === null) return
   category.name = name
-  save()
+  notify()
+  sync(() => put(`/renameCategory/${id}`, { name }))
 }
 
 export function deleteCategory(id: string) {
   const category = db.categories.find((c) => c._id === id)
   if (!category || category.group_id === null) return
+  const groupId = category.group_id
   db.categories = db.categories.filter((c) => c._id !== id)
   db.expenses.filter((e) => e.category_id === id).forEach((e) => {
     e.category_id = undefined
   })
-  save()
+  notify()
+  sync(() => del(`/deleteCategory/${groupId}/${id}`))
 }
 
 // ---- expenses ----
@@ -338,29 +417,31 @@ export function saveExpense(input: ExpenseInput, expenseId?: string) {
   else db.expenses.push({ _id: id, created_at: new Date().toISOString(), ...fields })
 
   db.expense_splits = db.expense_splits.filter((s) => s.expense_id !== id)
-  rows.filter((r) => r.included).forEach((r) => {
-    db.expense_splits.push({
-      _id: newId(),
-      expense_id: id,
-      participant_id: r.participant_id,
-      amount_owed: byPerson[r.participant_id],
-      split_value: r.value,
-    })
-  })
-  save()
+  const splits: ExpenseSplit[] = rows.filter((r) => r.included).map((r) => ({
+    _id: newId(),
+    expense_id: id,
+    participant_id: r.participant_id,
+    amount_owed: byPerson[r.participant_id],
+    split_value: r.value,
+  }))
+  db.expense_splits.push(...splits)
+  notify()
+
+  sync(() => post('/saveExpense', { _id: id, ...fields, splits }))
 }
 
 export function deleteExpense(id: string) {
   db.expenses = db.expenses.filter((e) => e._id !== id)
   db.expense_splits = db.expense_splits.filter((s) => s.expense_id !== id)
-  save()
+  notify()
+  sync(() => del(`/deleteExpense/${id}`))
 }
 
 // ---- payments ----
 
 // participant taps "I sent it" on their link page
 export function sendPayment(participant: Participant, toId: string, amount: number, method: string, note?: string) {
-  db.payments.push({
+  const payment: Payment = {
     _id: newId(),
     participant_id: participant._id,
     to_participant_id: toId,
@@ -370,22 +451,36 @@ export function sendPayment(participant: Participant, toId: string, amount: numb
     payment_method: method,
     transaction_id: note || undefined,
     sent_at: new Date().toISOString(),
-  })
-  save()
+  }
+  db.payments.push(payment)
+  notify()
+  sync(() =>
+    post(`/link/${encodeURIComponent(participant.access_token)}/sendPayment`, {
+      _id: payment._id,
+      to_participant_id: toId,
+      amount,
+      payment_method: method,
+      transaction_id: note || undefined,
+    }),
+  )
 }
 
-export function confirmPayment(id: string, status: 'confirmed' | 'disputed') {
+export function confirmPayment(id: string, newStatus: 'confirmed' | 'disputed') {
   const payment = db.payments.find((p) => p._id === id)
   if (!payment) return
-  payment.status = status
-  if (status === 'confirmed') payment.paid_at = new Date().toISOString()
-  save()
+  payment.status = newStatus
+  if (newStatus === 'confirmed') payment.paid_at = new Date().toISOString()
+  notify()
+
+  // on a private link page the link is the login, otherwise its the owner confirming
+  const path = status === 'link' ? `/link/${encodeURIComponent(linkToken)}/confirmPayment/${id}` : `/confirmPayment/${id}`
+  sync(() => post(path, { status: newStatus }))
 }
 
 // owner got cash in person, counts as confirmed right away
 export function recordPayment(participant: Participant, amount: number, method: string, note?: string) {
   const now = new Date().toISOString()
-  db.payments.push({
+  const payment: Payment = {
     _id: newId(),
     participant_id: participant._id,
     group_id: participant.group_id,
@@ -396,8 +491,10 @@ export function recordPayment(participant: Participant, amount: number, method: 
     sent_at: now,
     paid_at: now,
     recorded_by_owner: true,
-  })
-  save()
+  }
+  db.payments.push(payment)
+  notify()
+  sync(() => post('/recordPayment', { _id: payment._id, participant_id: participant._id, amount, payment_method: method, transaction_id: note || undefined }))
 }
 
 // ---- numbers for the pages ----

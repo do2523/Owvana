@@ -1,6 +1,6 @@
-const bcrypt = require("bcrypt");
 const crypto = require("node:crypto");
 const User = require("../database/models/User");
+const { sendVerificationEmail, sendPasswordResetEmail } = require("../services/mailer");
 
 function hashPassword(password) {
     return new Promise((resolve, reject) => {
@@ -13,6 +13,34 @@ function hashPassword(password) {
             }
 
             resolve(`${salt.toString("hex")}:${derivedKey.toString("hex")}`);
+        });
+    });
+}
+
+// Checks a password against a "salt:hash" string produced by hashPassword
+function verifyPassword(password, storedHash) {
+    return new Promise((resolve, reject) => {
+        if (typeof storedHash !== "string") {
+            resolve(false);
+            return;
+        }
+
+        const [saltHex, hashHex] = storedHash.split(":");
+
+        if (!saltHex || !hashHex) {
+            resolve(false);
+            return;
+        }
+
+        const originalHash = Buffer.from(hashHex, "hex");
+
+        crypto.scrypt(password, Buffer.from(saltHex, "hex"), originalHash.length, (error, derivedKey) => {
+            if (error) {
+                reject(error);
+                return;
+            }
+
+            resolve(crypto.timingSafeEqual(originalHash, derivedKey));
         });
     });
 }
@@ -54,7 +82,12 @@ async function register(req, res, next) {
             verify_expires_at: Date.now() + 24 * 60 * 60* 1000
         });
 
-        console.log(`http://localhost:5000/API/authorization/verifyEmail?token=${token}`);
+        try {
+            await sendVerificationEmail(normalizedEmail, token);
+        } catch (mailError) {
+            // Account exists; don't fail signup because the email didn't go out
+            console.error("Failed to send verification email:", mailError);
+        }
 
         res.status(201).json({
             message: "Account created successfully.",
@@ -100,6 +133,43 @@ async function verifyEmail(req, res)
 }
 
 
+async function resendVerification(req, res)
+{
+    try
+    {
+        const {email} = req.body || {};
+
+        if(typeof email !== "string" || !email.trim())
+            {
+                return res.status(400).json({message: "Missing fields"});
+            }
+
+        const user = await User.findOne({email: email.trim().toLowerCase()});
+
+        // Same response whether or not the account exists, so emails can't be probed
+        if(user && !user.email_verified)
+            {
+                const token = crypto.randomBytes(32).toString('hex');
+                user.verify_token_hash = crypto.createHash('sha256').update(token).digest('hex');
+                user.verify_expires_at = Date.now() + 24 * 60 * 60 * 1000;
+                await user.save();
+
+                try {
+                    await sendVerificationEmail(user.email, token);
+                } catch (mailError) {
+                    console.error("Failed to send verification email:", mailError);
+                }
+            }
+
+        res.status(200).json({message: "If that account needs verification, a new link was sent"});
+    }
+    catch(err)
+    {
+        console.error(err);
+        res.status(500).json({message: "Server error"});
+    }
+}
+
 async function forgotPassword(req, res)
 {
     try
@@ -111,7 +181,7 @@ async function forgotPassword(req, res)
                return res.status(400).json({message: "Missing fields"});
             }
         
-        const user = await User.findOne({email});
+        const user = await User.findOne({email: String(email).trim().toLowerCase()});
 
         if(user)
             {
@@ -120,7 +190,11 @@ async function forgotPassword(req, res)
                 user.reset_expires_at = Date.now() + 24 * 60 * 60* 1000;
                 await user.save();
 
-                console.log(`http://localhost:5000/API/authorization/reset-password?token=${token}`)
+                try {
+                    await sendPasswordResetEmail(user.email, token);
+                } catch (mailError) {
+                    console.error("Failed to send reset email:", mailError);
+                }
             }
         
         res.status(200).json({message: "Reset link was sent"});
@@ -167,7 +241,7 @@ async function resetPassword(req, res)
                 return res.status(400).json({message: "Invalid or expired token"});
             }
         
-        const passwordMatches = await bcrypt.compare(password, user.password_hash);
+        const passwordMatches = await verifyPassword(password, user.password_hash);
 
         if(passwordMatches)
             {
@@ -188,4 +262,4 @@ async function resetPassword(req, res)
     }
 }
 
-module.exports = { register, verifyEmail, forgotPassword, resetPassword };
+module.exports = { register, verifyEmail, resendVerification, forgotPassword, resetPassword };

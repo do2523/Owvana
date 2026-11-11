@@ -1,5 +1,7 @@
 const crypto = require("node:crypto");
+const jwt = require("jsonwebtoken");
 const User = require("../../backend/database/models/User");
+const { jwtSecret } = require("../../backend/config/env");
 
 // Verify password using the same method as registration
 function verifyPassword(password, storedHash) {
@@ -81,11 +83,27 @@ async function login(req, res) {
             });
         }
 
-        // TEMPORARY LOCAL TEST ONLY
-        // JWT and email verification are disabled for testing.
-        // This does not create an authenticated session.
+        // Block accounts that haven't verified their email yet
+        if (!user.email_verified) {
+            return res.status(403).json({
+                error: "Please verify your email before logging in"
+            });
+        }
+
+        if (!jwtSecret) {
+            console.error("JWT_SECRET is not set");
+            return res.status(500).json({ error: "Internal server error" });
+        }
+
+        // Signed token the client sends back as "Authorization: Bearer <token>"
+        const token = jwt.sign({ sub: String(user._id) }, jwtSecret, {
+            expiresIn: "7d"
+        });
+
         return res.status(200).json({
-            message: "Login credentials verified successfully"
+            message: "Login successful",
+            token,
+            user: { id: user._id, name: user.name, email: user.email }
         });
 
     } catch (error) {

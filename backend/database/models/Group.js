@@ -12,6 +12,11 @@ const groupSchema = new mongoose.Schema({
         required: true
     },
 
+    // background picked in the edit popup
+    scene: {
+        type: String
+    },
+
     created_at: {
         type: Date,
         default: Date.now

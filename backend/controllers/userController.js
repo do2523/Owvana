@@ -1,6 +1,6 @@
 const User = require("../database/models/User");
 const Group = require("../database/models/Group");
-const Category = require("../database/models/Category");
+const { deleteGroupsCascade } = require("../services/cascade");
 
 async function deleteUser(req, res)
 {
@@ -12,18 +12,21 @@ async function deleteUser(req, res)
             {
                 return res.status(400).json({message: "Missing fields"});
             }
-        
-        const user = await User.findByIdAndDelete(user_id);
+
+        if(user_id !== req.userId)
+            {
+                return res.status(403).json({message: "You can only delete your own account"});
+            }
+
+        const user = await User.findByIdAndDelete(req.userId);
 
         if(!user)
             {
                 return res.status(400).json({message: "User not found"});
             }
 
-        const group = await Group.find({owner_id: user._id});
-        const groups_ids = group.map((g) => g._id);
-        await Category.deleteMany({group_id: {$in: groups_ids}});
-        await Group.deleteMany({owner_id: user._id});
+        const groups = await Group.find({owner_id: user._id}, "_id").lean();
+        await deleteGroupsCascade(groups.map((g) => g._id));
 
         res.status(200).json({message: "User deleted"});
     }

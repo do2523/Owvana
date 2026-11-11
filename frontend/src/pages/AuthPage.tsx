@@ -5,9 +5,9 @@ import Logo from '../components/Logo'
 import { HeroScene } from '../components/Scenes'
 import ProductTour from '../components/ProductTour'
 import PasswordChecklist from '../components/PasswordChecklist'
-import { login, passwordProblem, register, saveToken } from '../api'
+import { login, passwordProblem, register } from '../api'
 import { navigate } from '../router'
-import { loginLocal, registerLocal, rememberUser } from '../store'
+import { beginSession } from '../store'
 
 type Props = { startTab: 'login' | 'signup' }
 
@@ -78,18 +78,6 @@ function LoginForm({ onSignup }: { onSignup: () => void }) {
     try {
       const res = await login(email.trim(), password)
 
-      // local testing only: backend is off or its test login gave no token, so let us in anyway.
-      // the real build never runs this
-      if (import.meta.env.DEV && (res.status >= 500 || (res.ok && !res.data.token))) {
-        if (!loginLocal(email.trim())) {
-          navigate(`/check-email?email=${encodeURIComponent(email.trim())}`)
-          return
-        }
-        saveToken('dev-token')
-        navigate('/dashboard')
-        return
-      }
-
       // 403 = account exists but email isnt verified yet, send them to the inbox screen
       if (res.status === 403) {
         navigate(`/check-email?email=${encodeURIComponent(email.trim())}`)
@@ -101,8 +89,7 @@ function LoginForm({ onSignup }: { onSignup: () => void }) {
         return
       }
 
-      saveToken(res.data.token)
-      rememberUser(email.trim())
+      beginSession(res.data.token)
       navigate('/dashboard')
     } catch {
       setError('Can’t reach the server right now. Try again in a sec.')
@@ -174,13 +161,7 @@ export function SignupForm({ onLogin }: { onLogin?: () => void }) {
       const name = `${firstName.trim()} ${lastName.trim()}`.trim()
       const res = await register(name, email.trim(), password, confirmPassword)
 
-      // backend off in local testing, so make the account in the browser instead
-      if (import.meta.env.DEV && res.status >= 500) {
-        if (!registerLocal(name, email.trim())) {
-          setError('An account with that email already exists.')
-          return
-        }
-      } else if (!res.ok) {
+      if (!res.ok) {
         setError(res.data.message ?? 'Couldn’t create your account.')
         return
       }

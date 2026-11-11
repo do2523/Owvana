@@ -1,9 +1,11 @@
 const app = require("./app");
 const connectDB = require("./database/db");
 const { mongoUri, port } = require("./config/env");
+const { ensureDefaultCategories } = require("./services/defaultCategories");
 
 async function startServer() {
     await connectDB(mongoUri);
+    await ensureDefaultCategories();
     app.listen(port, () => {
         console.log(`Backend listening on port ${port}`);
     });
