@@ -5,7 +5,7 @@ type ApiResult<T> = { ok: boolean; status: number; data: T & { message?: string 
 export async function request<T>(path: string, options: RequestInit = {}): Promise<ApiResult<T>> {
   // send the login token along if we have one
   const token = getToken()
-  const response = await fetch(path, {
+  const response = await fetch(path.startsWith('/api') ? path : `/api${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -48,7 +48,7 @@ export function del<T>(path: string) {
 
 // API branch version of /register wants password_confirmation too
 export function register(name: string, email: string, password: string, passwordConfirmation: string) {
-  return post<{ user?: { id: string; name: string; email: string } }>('/register', {
+  return post<{ user?: { id: string; name: string; email: string } }>('/api/register', {
     name,
     email,
     password,
@@ -57,7 +57,7 @@ export function register(name: string, email: string, password: string, password
 }
 
 export function login(email: string, password: string) {
-  return post<{ token?: string }>('/login', { email, password })
+  return post<{ token?: string }>('api/login', { email, password })
 }
 
 // the link in the email has ?token=... on it
@@ -68,7 +68,7 @@ export function verifyEmail(token: string) {
   let pending = verifyRequests.get(token)
   if (!pending) {
     const params = new URLSearchParams({ token })
-    pending = request<{ verified?: boolean }>(`/verifyEmail?${params}`)
+    pending = request<{ verified?: boolean }>(`api/verifyEmail?${params}`)
     verifyRequests.set(token, pending)
   }
   return pending
@@ -76,16 +76,16 @@ export function verifyEmail(token: string) {
 
 // these two match forgotPassword and resetPassword in API/authorization/passwordController.js
 export function sendResetLink(email: string) {
-  return post('/forgotPassword', { email })
+  return post('api/forgotPassword', { email })
 }
 
 // TODO: not on the API list yet, waiting on the API team for the real path
 export function resendVerification(email: string) {
-  return post('/resendVerification', { email })
+  return post('api/resendVerification', { email })
 }
 
 export function setNewPassword(token: string, password: string, passwordConfirmation: string) {
-  return post('/resetPassword', { token, password, password_confirmation: passwordConfirmation })
+  return post('api/resetPassword', { token, password, password_confirmation: passwordConfirmation })
 }
 
 export function saveToken(token: string) {
