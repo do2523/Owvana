@@ -1,24 +1,15 @@
-const nodemailer = require("nodemailer");
-const { appUrl, smtp } = require("../config/env");
+const { Resend } = require("resend");
+const { appUrl } = require("../config/env");
 
-const configured = Boolean(smtp.user && smtp.pass);
-
-const transporter = configured
-    ? nodemailer.createTransport({
-          host: smtp.host,
-          port: smtp.port,
-          secure: smtp.port === 465,
-          auth: { user: smtp.user, pass: smtp.pass },
-      })
-    : null;
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
 // Sends an email. If SMTP isn't configured, logs the message so local dev still works.
 async function sendMail({ to, subject, text, html }) {
-    if (!transporter) {
-        console.log(`[mailer] SMTP not configured; would send to ${to}: ${subject}\n${text}`);
+    if (!resend) {
+        console.log(`[mailer] Resend  not configured; would send to ${to}: ${subject}\n${text}`);
         return;
     }
-    await transporter.sendMail({ from: smtp.from, to, subject, text, html });
+    await resend.emails.send({ from: process.env.EMAIL_FROM, to, subject, text, html });
 }
 
 function button(url, label) {
